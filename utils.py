@@ -2,8 +2,14 @@
 Simple logging helper functions
 '''
 
-_UTILS_MIN_LOG_LEVEL_PRIVATE = 0
-_UTILS_LOG_LEVELS_PRIVATE = {
+from __future__ import print_function
+
+class __LoggingParameters:
+    pass
+
+__module = __LoggingParameters()
+__module.min_log_level = 0
+__module.log_levels = {
         'DEBUG': 0,
         'INFO': 1,
         'WARN': 2,
@@ -15,27 +21,21 @@ def set_log_level(level):
     Sets the minimum log level that should be output
     '''
 
-    global _UTILS_MIN_LOG_LEVEL_PRIVATE
-    global _UTILS_LOG_LEVELS_PRIVATE
-
-    if level in _UTILS_LOG_LEVELS_PRIVATE.values():
-        _UTILS_MIN_LOG_LEVEL_PRIVATE = level
+    if level in __module.log_levels.values():
+        __module.min_log_level = level
     else:
-        LOG_ERROR('utils.py: Requested log level unsupported')
+        LOG_ERROR('logging.py: Requested log level unsupported')
 
 def LOG(level, msg):
     '''
     Backbone logging function
     '''
 
-    global _UTILS_MIN_LOG_LEVEL_PRIVATE
-    global _UTILS_LOG_LEVELS_PRIVATE
-
     # Check if level is one of the defaults
-    if level in _UTILS_LOG_LEVELS_PRIVATE.keys():
+    if level in __module.log_levels.keys():
         # Check if the requested log level is greater than or equal to
         # the minimum logging level
-        if _UTILS_LOG_LEVELS_PRIVATE[level] >= _UTILS_MIN_LOG_LEVEL_PRIVATE:
+        if __module.log_levels[level] >= __module.min_log_level:
             print('[', level, ']: ', msg)
     else:
         # If the level is not a default level, always print it
