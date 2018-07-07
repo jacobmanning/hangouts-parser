@@ -158,15 +158,12 @@ class Conversation(object):
 
         # Perform message-type-based actions
         if msg_type == 'RENAME_CONVERSATION':
-            participant.add_rename_conversation_message()
             self.conversation_names.append(msg['conversation_rename']['new_name'])
         elif msg_type == 'ADD_USER':
-            participant.add_add_user_message()
             for id in msg['membership_change']['participant_id']:
                 if not self.is_participant(id['chat_id']):
                     self.add_participant(id['chat_id'])
         elif msg_type == 'HANGOUT_EVENT':
-            participant.add_hangout_event_message()
             event = msg['hangout_event']
             event_type = event['event_type']
 
