@@ -34,28 +34,20 @@ class ConversationParticipant(object):
         self.id = id
         self.name = name
         self.num_messages = {
-                'regular_chat': 0,
-                'rename_conversation': 0,
-                'remove_user': 0,
-                'add_user': 0,
-                'hangout_event': 0
+                'REGULAR_CHAT_MESSAGE': 0,
+                'RENAME_CONVERSATION': 0,
+                'REMOVE_USER': 0,
+                'ADD_USER': 0,
+                'HANGOUT_EVENT': 0
             }
         self.total_message_count = 0
 
-    def add_regular_chat_message(self):
-        self.num_messages['regular_chat'] += 1
-
-    def add_rename_conversation_message(self):
-        self.num_messages['rename_conversation'] += 1
-
-    def add_remove_user_message(self):
-        self.num_messages['remove_user'] += 1
-
-    def add_add_user_message(self):
-        self.num_messages['add_user'] += 1
-
-    def add_hangout_event_message(self):
-        self.num_messages['hangout_event'] += 1
+    def add_message(self, msg_type):
+        if msg_type not in self.num_messages.keys():
+            LOG_DEBUG('Trying to parse unknown message type: {}'.format(msg_type))
+            return
+        else:
+            self.num_messages[msg_type] += 1
 
     def update_total_message_count(self):
         self.total_message_count = sum(self.num_messages.values())
@@ -65,19 +57,16 @@ class ConversationParticipant(object):
         return self.total_message_count
 
     def get_name_or_id(self):
-        if self.name != 'unknown':
-            return self.name
-
-        return self.id
+        return self.name if self.name != 'unknown' else self.id
 
     def get_summary(self):
         return conversation_participant_summary.format(
                 self.name, self.id,
-                self.num_messages['regular_chat'],
-                self.num_messages['rename_conversation'],
-                self.num_messages['remove_user'],
-                self.num_messages['add_user'],
-                self.num_messages['hangout_event'])
+                self.num_messages['REGULAR_CHAT_MESSAGE'],
+                self.num_messages['RENAME_CONVERSATION'],
+                self.num_messages['REMOVE_USER'],
+                self.num_messages['ADD_USER'],
+                self.num_messages['HANGOUT_EVENT'])
 
 class Conversation(object):
     '''
@@ -145,30 +134,32 @@ class Conversation(object):
             if 'fallback_name' in p:
                 name = p['fallback_name']
             else:
+                # Default name
                 name = 'unknown'
 
             self.add_participant(id, name)
 
     def parse_message(self, msg):
+        # Extract details from message
         sender_id = msg['sender_id']['chat_id']
         msg_type = msg['event_type']
         timestamp = int(msg['timestamp']) / 1000000
 
+        # Check if conversation participant is known
         participant = self.get_participant(sender_id)
         if participant is None:
             LOG_DEBUG('Parsing message for unkown participant')
             self.message_data.append([timestamp, msg_type, sender_id])
             return
 
+        # Add message to database
         self.message_data.append([timestamp, msg_type, participant.get_name_or_id()])
+        participant.add_message(msg_type)
 
-        if msg_type == 'REGULAR_CHAT_MESSAGE':
-            participant.add_regular_chat_message()
-        elif msg_type == 'RENAME_CONVERSATION':
+        # Perform message-type-based actions
+        if msg_type == 'RENAME_CONVERSATION':
             participant.add_rename_conversation_message()
             self.conversation_names.append(msg['conversation_rename']['new_name'])
-        elif msg_type == 'REMOVE_USER':
-            participant.add_remove_user_message()
         elif msg_type == 'ADD_USER':
             participant.add_add_user_message()
             for id in msg['membership_change']['participant_id']:
@@ -181,8 +172,6 @@ class Conversation(object):
 
             if event_type == 'END_HANGOUT':
                 self.hangouts_duration_s += int(event['hangout_duration_secs'])
-        else:
-            LOG_DEBUG('Trying to parse unknown message type: {}'.format(msg_type))
 
     def parse(self):
         LOG_INFO('Parsing conversation with ID: {}'.format(self.conversation_id))
@@ -207,6 +196,7 @@ class Conversation(object):
             print(p.get_summary())
 
     def serialize(self, filename=None, prefix='output'):
+        # Assemble all data from conversation
         hangouts_data = {
                 'conversation_id': self.conversation_id,
                 'conversation_name': self.conversation_name,
@@ -218,11 +208,13 @@ class Conversation(object):
                 'messages': self.message_data
             }
 
+        # Create output directory if it doesn't exist
         output_dir = os.path.join(os.getcwd(), prefix)
 
         if not os.path.isdir(output_dir):
             os.mkdir(output_dir)
 
+        # Set default filename
         if filename is None:
             filename = '{}-parsed.pkl'.format(self.conversation_id)
 
@@ -244,10 +236,12 @@ def main(file_path):
         LOG_ERROR('File path must be a json file')
         return
 
+    # Parse JSON
     with open(file_path, encoding='utf-8') as f:
         LOG_INFO('Parsing JSON file: {}'.format(file_path))
         json_archive = json.load(f)
 
+        # Parse each conversation
         for state in json_archive['conversation_state']:
             conv = Conversation(state)
             conv.parse()
