@@ -238,6 +238,10 @@ def main(file_path):
         LOG_INFO('Parsing JSON file: {}'.format(file_path))
         json_archive = json.load(f)
 
+        if not 'conversation_state' in json_archive.keys():
+            LOG_ERROR('Could not find `conversation_state` in file {}'.format(file_path))
+            return
+
         # Parse each conversation
         for state in json_archive['conversation_state']:
             conv = Conversation(state)
